@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SRGAN - When Pixels Learn to Dream</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --accent: #e8c46a;
+    --accent2: #c47ae8;
+    --text: #e8e6df;
+    --muted: #7a7870;
+    --border: #2a2a38;
+    --highlight: rgba(232,196,106,0.08);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    line-height: 1.8;
+    font-size: 17px;
+    overflow-x: hidden;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0 6vw 8vh;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse 80% 60% at 60% 40%, #1a0f35 0%, var(--bg) 70%);
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 80%, rgba(196,122,232,0.12) 0%, transparent 40%),
+      radial-gradient(circle at 80% 20%, rgba(232,196,106,0.10) 0%, transparent 40%);
+    pointer-events: none;
+  }
+
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,196,106,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,196,106,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  .hero-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.2s forwards;
+  }
+
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 900;
+    line-height: 1.0;
+    letter-spacing: -0.02em;
+    margin-bottom: 2.5rem;
+    opacity: 0;
+    animation: fadeUp 0.9s 0.4s forwards;
+  }
+
+  .hero-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero-subtitle {
+    max-width: 600px;
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin-bottom: 3rem;
+    opacity: 0;
+    animation: fadeUp 0.9s 0.6s forwards;
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: 3rem;
+    flex-wrap: wrap;
+    opacity: 0;
+    animation: fadeUp 0.9s 0.8s forwards;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .meta-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .meta-value {
+    font-size: 0.95rem;
+    color: var(--text);
+    font-weight: 400;
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 3vh;
+    right: 6vw;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    animation: fadeUp 1s 1.2s forwards;
+  }
+
+  .scroll-hint::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: var(--muted);
+  }
+
+  /* ── LAYOUT ── */
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .wide-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  /* ── SECTION DIVIDER ── */
+  .section-rule {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin: 5rem 0 3rem;
+  }
+
+  .section-rule .rule-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .section-rule::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── TYPOGRAPHY ── */
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.9rem, 4vw, 2.8rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-top: 2.5rem;
+    margin-bottom: 0.9rem;
+    color: var(--accent);
+  }
+
+  p {
+    margin-bottom: 1.4rem;
+    color: #ccc9c0;
+  }
+
+  strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(232,196,106,0.3);
+    transition: border-color 0.2s;
+  }
+
+  a:hover { border-color: var(--accent); }
+
+  /* ── PULL QUOTE ── */
+  .pull-quote {
+    margin: 3.5rem 0;
+    padding: 2.5rem 3rem;
+    border-left: 3px solid var(--accent);
+    background: var(--highlight);
+    border-radius: 0 8px 8px 0;
+    position: relative;
+  }
+
+  .pull-quote p {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-style: italic;
+    line-height: 1.6;
+    color: var(--text);
+    margin: 0;
+  }
+
+  /* ── CALLOUT BOX ── */
+  .callout {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    margin: 2.5rem 0;
+  }
+
+  .callout-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .callout p { margin: 0; color: var(--text); }
+
+  /* ── ARCHITECTURE VISUAL ── */
+  .arch-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 3rem 0;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .arch-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    text-align: center;
+    min-width: 110px;
+    flex-shrink: 0;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .arch-box:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .arch-box .box-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .arch-box .box-title {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  .arch-box.accent-box {
+    border-color: var(--accent);
+    background: rgba(232,196,106,0.06);
+  }
+
+  .arch-box.accent-box .box-title { color: var(--accent); }
+
+  .arch-box.purple-box {
+    border-color: var(--accent2);
+    background: rgba(196,122,232,0.06);
+  }
+
+  .arch-box.purple-box .box-title { color: var(--accent2); }
+
+  .arch-arrow {
+    font-size: 1.5rem;
+    color: var(--muted);
+    padding: 0 0.6rem;
+    flex-shrink: 0;
+  }
+
+  /* ── RESULTS TABLE ── */
+  .results-table-wrap {
+    overflow-x: auto;
+    margin: 2.5rem 0;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  thead {
+    background: var(--surface2);
+  }
+
+  thead th {
+    padding: 1rem 1.3rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: var(--highlight); }
+  tbody tr:last-child { border-bottom: none; }
+
+  tbody td {
+    padding: 0.85rem 1.3rem;
+    color: #bbb8af;
+  }
+
+  tbody td:first-child {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .best { color: var(--accent); font-weight: 500; }
+  .highlight-row td { background: rgba(232,196,106,0.04); }
+
+  /* ── LOSS FUNCTION VISUAL ── */
+  .loss-equation {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2rem 2.5rem;
+    margin: 2rem 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.9rem;
+    line-height: 2.2;
+    color: var(--text);
+  }
+
+  .eq-accent { color: var(--accent); }
+  .eq-purple { color: var(--accent2); }
+  .eq-muted { color: var(--muted); font-size: 0.78rem; }
+
+  /* ── CRITICISM CARDS ── */
+  .crit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.2rem;
+    margin: 2.5rem 0;
+  }
+
+  .crit-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.8rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .crit-card:hover {
+    border-color: #3a3a50;
+    transform: translateY(-2px);
+  }
+
+  .crit-icon {
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+  }
+
+  .crit-card h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.7rem;
+  }
+
+  .crit-card p {
+    font-size: 0.9rem;
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ── IMPROVEMENT CARDS ── */
+  .improve-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+
+  .improve-item {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    padding: 1.4rem 1.8rem;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .improve-item:hover { border-color: rgba(232,196,106,0.3); }
+
+  .improve-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.3rem;
+    color: var(--accent);
+    font-weight: 500;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .improve-text h4 {
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+    font-size: 0.95rem;
+  }
+
+  .improve-text p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── TIMELINE (related work) ── */
+  .timeline {
+    position: relative;
+    margin: 2.5rem 0;
+    padding-left: 2rem;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .tl-item {
+    position: relative;
+    margin-bottom: 2rem;
+    padding-left: 1.5rem;
+  }
+
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: -2.4rem;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 2px solid var(--bg);
+  }
+
+  .tl-item.highlight::before { background: var(--accent); }
+
+  .tl-year {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .tl-title {
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-size: 0.95rem;
+  }
+
+  .tl-desc {
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    margin-top: 8rem;
+    padding: 4rem 2rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .footer-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  footer p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    padding: 0.7rem 1.6rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background 0.2s;
+    text-decoration: none;
+  }
+
+  .github-link:hover {
+    background: rgba(232,196,106,0.08);
+    border-color: var(--accent);
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── PIXEL DEGRADATION DEMO ── */
+  .pixel-demo {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 2.5rem 0;
+  }
+
+  .pixel-panel {
+    background: var(--surface);
+    padding: 2rem 1.5rem;
+    text-align: center;
+  }
+
+  .pixel-vis {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .vis-lr {
+    background: repeating-linear-gradient(
+      45deg,
+      #3a3060,
+      #3a3060 6px,
+      #2a2050 6px,
+      #2a2050 12px
+    );
+    filter: blur(2px);
+  }
+
+  .vis-mse {
+    background: repeating-linear-gradient(
+      45deg,
+      #4a4070,
+      #4a4070 4px,
+      #3a3060 4px,
+      #3a3060 8px
+    );
+    filter: blur(0.8px);
+  }
+
+  .vis-srgan {
+    background: repeating-linear-gradient(
+      45deg,
+      #6a5a90,
+      #6a5a90 2px,
+      #3a3060 2px,
+      #3a3060 6px
+    );
+    filter: none;
+  }
+
+  .pixel-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .pixel-score {
+    font-size: 0.82rem;
+    color: var(--text);
+  }
+
+  .pixel-mos { color: var(--accent); font-weight: 500; }
+
+  /* ── MOS BAR CHART ── */
+  .mos-chart {
+    margin: 2.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .mos-row {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+  }
+
+  .mos-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    width: 100px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  .mos-bar-bg {
+    flex: 1;
+    height: 28px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .mos-bar {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    transition: width 1.5s cubic-bezier(0.23, 1, 0.32, 1);
+    width: 0;
+  }
+
+  .mos-bar span {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: rgba(0,0,0,0.6);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 600px) {
+    .arch-flow { flex-direction: column; align-items: flex-start; }
+    .arch-arrow { transform: rotate(90deg); }
+    .pixel-demo { grid-template-columns: 1fr; }
+    .mos-name { width: 70px; font-size: 9px; }
+    h2 { font-size: 1.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ HERO ══════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="grid-bg"></div>
+  <div class="hero-tag">Paper Deep Dive &nbsp;·&nbsp; CVPR 2017 &nbsp;·&nbsp; Image Super-Resolution</div>
+  <h1 class="hero-title">
+    When Pixels<br><em>Learn to Dream</em>
+  </h1>
+  <p class="hero-subtitle">
+    A deep dive into SRGAN - the paper that made machines hallucinate photo-realistic textures from blurry inputs, and why that was a bigger deal than PSNR would ever tell you.
+  </p>
+  <div class="hero-meta">
+    <div class="meta-item">
+      <span class="meta-label">Paper</span>
+      <span class="meta-value">Photo-Realistic SISR Using a GAN</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Authors</span>
+      <span class="meta-value">Ledig et al. (Twitter / DeepMind)</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Venue</span>
+      <span class="meta-value">CVPR 2017</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">GitHub</span>
+      <span class="meta-value">leftthomas/SRGAN &amp; xinntao/BasicSR</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Authors</span>
+      <span class="meta-value">Kriday Parmar, Yash Toshniwal, Akshaan Khan</span>
+    </div>
+  </div>
+  <div class="scroll-hint">scroll to read</div>
+</section>
+
+<!-- ══ BODY ══════════════════════════════════════════════════════════ -->
+<main>
+
+<!-- ─ 1. THE PROBLEM ─────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">01 · The Problem</span></div>
+
+  <h2 class="reveal">Zooming In Shouldn't Mean Blurring Out</h2>
+
+  <p class="reveal">Imagine you're a forensic analyst and you're trying to read a partial license plate from CCTV footage. Or a radiologist trying to detect a suspicious mass on an MRI taken on aging equipment. Or a satellite operator trying to identify structures in aerial imagery shot at low resolution to save bandwidth. In every one of these cases, you face the same fundamental frustration: <strong>upscaling a low-resolution image just makes things worse.</strong></p>
+
+  <p class="reveal">Before SRGAN, the dominant solution was bicubic interpolation - essentially a weighted average of surrounding pixels. It's mathematically tidy, fast to compute, and produces images that are almost insultingly blurry. Deep learning approaches before 2017, like SRCNN, had improved upon bicubic in terms of pixel-level metrics, but they were still optimizing for the wrong thing.</p>
+
+  <div class="pull-quote reveal">
+    <p>"The core problem was not the network architecture. It was the loss function. Everyone was training their models to be <em>pixel-accurate</em>. But human perception doesn't work pixel by pixel."</p>
+  </div>
+
+  <p class="reveal">When a network minimises Mean Squared Error (MSE) between a generated and reference image, it is mathematically penalised for any pixel being in the wrong place. The safest strategy for the network is therefore to <strong>predict the average of all plausible high-resolution outputs</strong> - which is a blurry image. It looks right in aggregate, but wrong in every specific texture. This is not a bug; it is a perfectly rational response to a poorly designed objective.</p>
+
+  <p class="reveal">Ledig et al. (2017) identified this as the central unsolved problem: how do you train a network to produce outputs that look realistic to a <em>human</em>, not just outputs that are numerically close to a reference?</p>
+</div>
+
+<!-- ─ 2. RELEVANCE ─────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">02 · Why It Matters</span></div>
+
+  <h2 class="reveal">The Perception-Distortion Trade-off Is Real</h2>
+
+  <p class="reveal">Super-resolution is not a niche academic problem. Low-resolution imagery is everywhere - legacy surveillance systems, mobile cameras in low light, compressed streaming video, historical archives, satellite data, and medical scanners with physical hardware limits. The ability to intelligently reconstruct detail from these images has genuine, high-stakes applications.</p>
+
+  <p class="reveal">But beyond the application, what SRGAN gets at is something deeper: <strong>the gap between numerical metrics and human perception.</strong> This is a problem that shows up across all of generative AI. A model can score exceptionally well on PSNR and SSIM and still produce output that looks obviously fake to a human rater. SRGAN is arguably the first paper that made this tension explicit, quantified it via a formal MOS study, and proposed a concrete training strategy to close the gap.</p>
+
+  <p class="reveal">The paper is also historically significant as one of the first applications of GANs to a low-level vision task. At the time, GANs had been used primarily for image synthesis and style transfer. Using adversarial training to <em>constrain</em> image reconstruction toward perceptual plausibility was a genuinely novel idea that opened an entire research direction - one that directly influenced later work in image restoration, denoising, inpainting, and face hallucination.</p>
+</div>
+
+<!-- ─ 3. PRIOR WORK ─────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">03 · The Road Before SRGAN</span></div>
+
+  <h2 class="reveal">A Short History of Upscaling</h2>
+
+  <div class="timeline reveal">
+    <div class="tl-item">
+      <div class="tl-year">Pre-2014</div>
+      <div class="tl-title">Classical Methods</div>
+      <div class="tl-desc">Bicubic interpolation, nearest-neighbor, sparse coding methods. Fast but produce smooth, blurry results with no understanding of image semantics.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-year">ECCV 2014</div>
+      <div class="tl-title">SRCNN - Dong et al.</div>
+      <div class="tl-desc">First CNN-based super-resolution. A simple 3-layer network trained end-to-end. Improved PSNR over bicubic, but architecturally shallow and still optimized for MSE loss - outputs remained blurry.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-year">CVPR 2016</div>
+      <div class="tl-title">VDSR &amp; DRCN</div>
+      <div class="tl-desc">Very Deep Super-Resolution (VDSR) showed that depth helps. DRCN used recursive convolutions. Both improved PSNR metrics significantly, but the visual blurriness problem persisted - deeper networks, same loss function, same problem.</div>
+    </div>
+    <div class="tl-item highlight">
+      <div class="tl-year">CVPR 2017</div>
+      <div class="tl-title">SRGAN - Ledig et al. ← This Paper</div>
+      <div class="tl-desc">The turning point. Perceptual loss + adversarial loss. PSNR goes down slightly but human-judged realism goes up dramatically. First 4× SR method to produce photo-realistic results.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-year">ECCVW 2018</div>
+      <div class="tl-title">ESRGAN - Wang et al.</div>
+      <div class="tl-desc">Direct improvement on SRGAN. Removes batch normalization, uses Residual-in-Residual Dense Blocks, and improves perceptual loss by using pre-activation VGG features. Wins PIRM 2018 SR Challenge.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─ 4. THE APPROACH ─────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">04 · The Approach</span></div>
+
+  <h2 class="reveal">Teaching a Network to Perceive, Not Just Measure</h2>
+
+  <p class="reveal">SRGAN proposes a full generative adversarial framework for single image super-resolution (SISR). The key idea is to replace the pixel-space MSE loss with a <strong>perceptual loss</strong> that operates in a learned feature space, combined with an adversarial loss to push outputs toward the natural image manifold.</p>
+
+  <h3>The Architecture</h3>
+  <p class="reveal">The overall pipeline is a Generator–Discriminator pair trained jointly in the standard GAN framework. The generator's job is to upscale a low-resolution image to 4× resolution. The discriminator's job is to tell real high-res images apart from generated ones.</p>
+
+  <div class="arch-flow reveal">
+    <div class="arch-box accent-box">
+      <div class="box-label">Input</div>
+      <div class="box-title">LR Image<br/><small style="color:var(--muted);font-size:0.78rem;">e.g. 64×64</small></div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">
+      <div class="box-label">Generator (G)</div>
+      <div class="box-title">16 ResBlocks<br/>+ PixelShuffle</div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box accent-box">
+      <div class="box-label">Output</div>
+      <div class="box-title">SR Image<br/><small style="color:var(--muted);font-size:0.78rem;">e.g. 256×256</small></div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box purple-box">
+      <div class="box-label">Discriminator (D)</div>
+      <div class="box-title">VGG-style<br/>Classifier</div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">
+      <div class="box-label">Judge</div>
+      <div class="box-title">Real or Fake?</div>
+    </div>
+  </div>
+
+  <p class="reveal"><strong>The Generator</strong> is a deep ResNet with 16 residual blocks in its body, each block containing two convolutional layers with batch normalisation and PReLU activations. Skip connections (as in He et al.'s original ResNet) allow gradient to flow freely even through very deep stacks. The final upsampling is handled by sub-pixel convolution layers (PixelShuffle), which efficiently rearrange feature map channels into spatial resolution - a much cheaper and better-performing alternative to deconvolution layers.</p>
+
+  <p class="reveal"><strong>The Discriminator</strong> is a VGG-style network that takes either the SR output or a real HR image and outputs a scalar probability. It uses strided convolution instead of pooling (following DCGAN conventions) and LeakyReLU activations throughout.</p>
+
+  <h3>The Loss Function - The Real Innovation</h3>
+  <p class="reveal">The generator is not just trained adversarially. Its total loss is a weighted combination of two terms:</p>
+
+  <div class="loss-equation reveal">
+    <div><span class="eq-accent">ℓ<sup>SR</sup></span> = <span class="eq-accent">ℓ<sub>content</sub><sup>SR</sup></span> + <span class="eq-purple">10<sup>-3</sup> · ℓ<sub>adversarial</sub><sup>SR</sup></span></div>
+    <br/>
+    <div class="eq-muted">Content loss (VGG feature-space MSE):</div>
+    <div><span class="eq-accent">ℓ<sub>VGG/5.4</sub><sup>SR</sup></span> = (1/WH) · Σ ‖ φ(I<sup>HR</sup>) − φ(G(I<sup>LR</sup>)) ‖²</div>
+    <br/>
+    <div class="eq-muted">Adversarial loss (log-probability from discriminator):</div>
+    <div><span class="eq-purple">ℓ<sub>adversarial</sub><sup>SR</sup></span> = Σ −log D(G(I<sup>LR</sup>))</div>
+    <br/>
+    <div class="eq-muted">where φ denotes feature maps of VGG19 at layer 5.4 (after 4th conv in block 5, before 5th maxpool)</div>
+  </div>
+
+  <p class="reveal">The content loss computes the MSE not between raw pixels, but between the <strong>VGG feature representations</strong> of the generated and reference images. VGG has been pretrained on ImageNet classification - its internal feature maps encode high-level semantic and textural information. Two images that look similar to a human will be close in VGG feature space even if they differ pixel-by-pixel. This is the mechanism by which the loss becomes perceptual.</p>
+
+  <p class="reveal">The authors specifically use features from VGG19's φ<sub>5,4</sub> layer (deep in the network, after 4 convolutional layers in the 5th block). They ablate other layer choices (VGG<sub>2,2</sub>) and find that deeper features produce more photo-realistic but slightly lower-PSNR results - a direct demonstration of the perception-distortion trade-off.</p>
+
+  <div class="callout reveal">
+    <div class="callout-title">Training Procedure</div>
+    <p>The generator is first pre-trained using MSE loss alone for 10⁶ steps to avoid poor local minima from random initialisation. The GAN training then fine-tunes from this checkpoint using the full perceptual + adversarial loss. Training data: 350K random images from ImageNet. Optimizer: Adam (β₁=0.9), LR = 10⁻⁴ for 10⁵ steps then 10⁻⁵ for a further 10⁵ steps. Patch size: 96×96 HR crops (24×24 LR inputs).</p>
+  </div>
+</div>
+
+<!-- ─ 5. RESULTS ─────────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">05 · Results</span></div>
+
+  <h2 class="reveal">The Numbers Tell Half the Story</h2>
+
+  <p class="reveal">All experiments use a 4× upscaling factor, evaluated on three standard benchmarks: <strong>Set5</strong> (5 images), <strong>Set14</strong> (14 images), and <strong>BSD100</strong> (100 images). The standard metrics are PSNR (higher is better) and SSIM (higher is better, max 1.0), both computed on the Y-channel (luminance) of YCbCr-converted images. A key addition is <strong>MOS (Mean Opinion Score)</strong> - 26 human raters scored images 1–5 for realism.</p>
+
+  <div class="results-table-wrap reveal">
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>PSNR Set5 ↑</th>
+          <th>SSIM Set5 ↑</th>
+          <th>PSNR Set14 ↑</th>
+          <th>SSIM Set14 ↑</th>
+          <th>MOS BSD100 ↑</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Bicubic</td>
+          <td>28.42</td>
+          <td>0.810</td>
+          <td>26.00</td>
+          <td>0.703</td>
+          <td>~1.9</td>
+        </tr>
+        <tr>
+          <td>SRCNN</td>
+          <td>30.48</td>
+          <td>0.863</td>
+          <td>27.50</td>
+          <td>0.751</td>
+          <td>~2.3</td>
+        </tr>
+        <tr class="highlight-row">
+          <td>SRResNet (MSE)</td>
+          <td class="best">32.05</td>
+          <td class="best">0.909</td>
+          <td class="best">28.49</td>
+          <td class="best">0.778</td>
+          <td>2.98</td>
+        </tr>
+        <tr class="highlight-row">
+          <td><strong>SRGAN-VGG54</strong></td>
+          <td>29.40</td>
+          <td>0.851</td>
+          <td>26.02</td>
+          <td>0.739</td>
+          <td class="best">3.58</td>
+        </tr>
+        <tr>
+          <td>Original HR</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td class="best">~3.8</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="reveal">The table tells a story that the authors intended: <strong>SRGAN loses on every pixel-level metric compared to SRResNet</strong>, yet wins decisively on MOS. It achieves a MOS of 3.58 vs SRResNet's 2.98 on BSD100 - a gap that is statistically significant and maps to a clear visual difference. SRGAN outputs have fine grain, believable textures, and edges with crispness. SRResNet outputs are smooth, correct, and dull.</p>
+
+  <p class="reveal">Crucially, SRGAN's MOS scores are <em>closer to those of the original HR images</em> than any other method's - a striking result that validates the core thesis that perceptual loss training produces subjectively superior output.</p>
+
+  <h3>Visualising the MOS Gap</h3>
+  <div class="mos-chart reveal" id="mosChart">
+    <div class="mos-row">
+      <div class="mos-name">Bicubic</div>
+      <div class="mos-bar-bg">
+        <div class="mos-bar" style="background: #444; width: 0%" data-width="38%">
+          <span>1.9 / 5</span>
+        </div>
+      </div>
+    </div>
+    <div class="mos-row">
+      <div class="mos-name">SRCNN</div>
+      <div class="mos-bar-bg">
+        <div class="mos-bar" style="background: #555; width: 0%" data-width="46%">
+          <span>2.3 / 5</span>
+        </div>
+      </div>
+    </div>
+    <div class="mos-row">
+      <div class="mos-name">SRResNet</div>
+      <div class="mos-bar-bg">
+        <div class="mos-bar" style="background: #6a5fa0; width: 0%" data-width="60%">
+          <span>2.98 / 5</span>
+        </div>
+      </div>
+    </div>
+    <div class="mos-row">
+      <div class="mos-name">SRGAN</div>
+      <div class="mos-bar-bg">
+        <div class="mos-bar" style="background: linear-gradient(90deg, #c4a030, #e8c46a); width: 0%" data-width="71.6%">
+          <span>3.58 / 5</span>
+        </div>
+      </div>
+    </div>
+    <div class="mos-row">
+      <div class="mos-name">Original HR</div>
+      <div class="mos-bar-bg">
+        <div class="mos-bar" style="background: #4a9a5a; width: 0%" data-width="76%">
+          <span>~3.8 / 5</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>The Perceptual vs. Pixel Trade-off, Visualised</h3>
+
+  <div class="pixel-demo reveal">
+    <div class="pixel-panel">
+      <div class="pixel-vis vis-lr"></div>
+      <div class="pixel-label">Bicubic</div>
+      <div class="pixel-score">PSNR: 28.42<br/><span class="pixel-mos">MOS: ~1.9</span></div>
+    </div>
+    <div class="pixel-panel">
+      <div class="pixel-vis vis-mse"></div>
+      <div class="pixel-label">SRResNet (MSE)</div>
+      <div class="pixel-score">PSNR: 32.05<br/><span class="pixel-mos" style="color:#9a8af0;">MOS: 2.98</span></div>
+    </div>
+    <div class="pixel-panel">
+      <div class="pixel-vis vis-srgan"></div>
+      <div class="pixel-label">SRGAN-VGG54</div>
+      <div class="pixel-score">PSNR: 29.40<br/><span class="pixel-mos">MOS: 3.58</span></div>
+    </div>
+  </div>
+
+  <p class="reveal" style="font-size:0.85rem; color: var(--muted); text-align:center; margin-top:-1rem;">Visual abstraction showing relative sharpness and texture richness. SRResNet wins on PSNR but SRGAN wins on human preference.</p>
+</div>
+
+<!-- ─ 6. CRITICAL ANALYSIS ──────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">06 · Critical Analysis</span></div>
+
+  <h2 class="reveal">What the Paper Gets Right - and Where It Stumbles</h2>
+
+  <p class="reveal">SRGAN is a landmark paper, but it is not without genuine weaknesses. A careful reading reveals several methodological and conceptual limitations that the community later worked to address.</p>
+
+  <div class="crit-grid reveal">
+
+    <div class="crit-card">
+      <div class="crit-icon">🎭</div>
+      <h4>Texture Hallucination Risk</h4>
+      <p>SRGAN sometimes generates textures that look realistic but are <em>factually wrong</em> - bricks in the wrong pattern, fur going the wrong direction, wrinkles added to smooth faces. For forensics, medical imaging, or satellite analysis, this is dangerous. The paper does not discuss or evaluate this failure mode.</p>
+    </div>
+
+    <div class="crit-card">
+      <div class="crit-icon">📐</div>
+      <h4>VGG Was Not Designed for This</h4>
+      <p>The perceptual loss uses features from a VGG19 trained for <em>ImageNet classification</em>. There is no principled reason why classification features are optimal for measuring perceptual image quality. ESRGAN (2018) later demonstrated that using pre-activation features rather than post-activation features from the same VGG network yields significantly better texture recovery - a detail the original paper missed.</p>
+    </div>
+
+    <div class="crit-card">
+      <div class="crit-icon">⚙️</div>
+      <h4>Batch Normalisation Artifacts</h4>
+      <p>The residual blocks in both the generator and discriminator use batch normalisation. ESRGAN later showed that BN layers in a GAN framework are prone to introducing high-frequency checkerboard artifacts, especially when training distribution and test distribution differ. Removing BN consistently improved results.</p>
+    </div>
+
+    <div class="crit-card">
+      <div class="crit-icon">📊</div>
+      <h4>MOS Study Limitations</h4>
+      <p>The MOS evaluation uses 26 raters - a reasonably small sample. More critically, the paper does not report inter-rater agreement, variance, or how raters were recruited and calibrated. For a result whose entire thesis rests on human perceptual judgment, this methodological detail matters significantly.</p>
+    </div>
+
+    <div class="crit-card">
+      <div class="crit-icon">🌍</div>
+      <h4>Training–Test Distribution Mismatch</h4>
+      <p>The model is trained on random ImageNet images but tested on Set5/Set14/BSD100, which consist of specific natural scenes. The paper does not evaluate generalisation to out-of-distribution inputs like medical scans, satellite imagery, or text-heavy images - domains where it is practically deployed.</p>
+    </div>
+
+    <div class="crit-card">
+      <div class="crit-icon">🎛️</div>
+      <h4>Training Instability Not Addressed</h4>
+      <p>GAN training is notoriously unstable. The paper reports a specific set of hyperparameters and results but does not discuss sensitivity to these choices, how many training runs were conducted, or what failure modes occur. Reproducibility is a real concern that the paper does not address honestly.</p>
+    </div>
+
+  </div>
+
+  <div class="pull-quote reveal">
+    <p>"SRGAN proved that you can trade pixel-accuracy for perceptual quality - a fundamentally important insight. But it left open the harder question: <em>how much texture hallucination is acceptable, and in which contexts?</em>"</p>
+  </div>
+</div>
+
+<!-- ─ 7. IMPROVEMENTS ─────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">07 · What Could Be Done Better</span></div>
+
+  <h2 class="reveal">Paths Forward</h2>
+
+  <p class="reveal">Based on the critical analysis above and subsequent work in the field, here are concrete improvements that either the community has since validated or that remain open directions:</p>
+
+  <div class="improve-list reveal">
+
+    <div class="improve-item">
+      <div class="improve-num">01</div>
+      <div class="improve-text">
+        <h4>Remove Batch Normalisation → Validated by ESRGAN</h4>
+        <p>ESRGAN (Wang et al., ECCVW 2018) removed all BN layers from the residual blocks and observed consistently better performance with fewer artifacts across all test datasets. This is perhaps the cleanest, most easily validated improvement. BN layers introduce inconsistencies between training-time statistics and test-time statistics, which are particularly harmful under a GAN objective.</p>
+      </div>
+    </div>
+
+    <div class="improve-item">
+      <div class="improve-num">02</div>
+      <div class="improve-text">
+        <h4>Use Pre-Activation VGG Features → Validated by ESRGAN</h4>
+        <p>The original SRGAN uses VGG features <em>after</em> ReLU activation, which can cause many feature values to be zero (sparse). Using features <em>before</em> the activation function preserves more gradient signal and produces better brightness consistency and texture recovery in the loss landscape.</p>
+      </div>
+    </div>
+
+    <div class="improve-item">
+      <div class="improve-num">03</div>
+      <div class="improve-text">
+        <h4>Relativistic Discriminator → Validated by ESRGAN</h4>
+        <p>The standard GAN discriminator asks "is this real?" ESRGAN's Relativistic average GAN (RaGAN) instead asks "is this more realistic than the average fake?" This provides a more stable training signal and better perceptual quality because the generator learns not just to fool the discriminator but to be relatively more realistic than its counterparts.</p>
+      </div>
+    </div>
+
+    <div class="improve-item">
+      <div class="improve-num">04</div>
+      <div class="improve-text">
+        <h4>Semantic-Aware Perceptual Loss → Open Direction</h4>
+        <p>The VGG loss treats all regions of an image equally. A semantically-aware perceptual loss would weight face regions, text regions, and structured surfaces differently - prioritising accuracy where hallucination is most dangerous. Wang et al. (2018) began exploring this with segmentation-conditioned SR, but it remains an underexplored direction for general SR models.</p>
+      </div>
+    </div>
+
+    <div class="improve-item">
+      <div class="improve-num">05</div>
+      <div class="improve-text">
+        <h4>Uncertainty-Aware Output → Novel Direction</h4>
+        <p>SRGAN produces a single deterministic output for a given LR input. A more principled approach would model the distribution of possible HR images consistent with a given LR input, producing multiple plausible outputs with associated uncertainty estimates. This would be especially valuable in safety-critical applications like medical imaging where knowing when the model is "guessing" is as important as the guess itself.</p>
+      </div>
+    </div>
+
+    <div class="improve-item">
+      <div class="improve-num">06</div>
+      <div class="improve-text">
+        <h4>Better Perceptual Metrics in Evaluation → Methodological</h4>
+        <p>PSNR and SSIM are acknowledged by the authors themselves to be poor proxies for human perceptual quality. Subsequent work introduced LPIPS (Learned Perceptual Image Patch Similarity) as a better automatic perceptual metric. Future evaluations should include LPIPS alongside PSNR/SSIM to bridge the gap between automated and human evaluation without the cost of running MOS studies for every experiment.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─ 8. GITHUB & REPRODUCIBILITY ─────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">08 · Code &amp; Reproducibility</span></div>
+
+  <h2 class="reveal">Running It Yourself</h2>
+
+  <p class="reveal">The paper's official implementation is available and actively maintained through Xinntao's BasicSR toolbox, which includes SRResNet, SRGAN, and ESRGAN under a unified training framework. For learning and reproduction purposes, PyTorch-only implementations are clean and well-suited for Google Colab experimentation.</p>
+
+  <div class="callout reveal">
+    <div class="callout-title">Recommended Repositories</div>
+    <p>
+      <strong>leftthomas/SRGAN</strong> - Clean PyTorch implementation, minimal dependencies, confirmed Colab-compatible.<br/><br/>
+      <strong>xinntao/BasicSR</strong> - Official unified toolbox including SRResNet, SRGAN, ESRGAN. More dependencies but production-grade.<br/><br/>
+      <strong>Training dataset:</strong> BSD300 (200 train images). Testing: Set5 (5 images), Set14 (14 images).<br/><br/>
+      <strong>Colab estimate:</strong> ~5–10 minutes per epoch on BSD300 with a T4 GPU. Meaningful results visible at 50–100 epochs.
+    </p>
+  </div>
+</div>
+
+<!-- ─ 9. CONCLUSION ─────────────────────────────────────────────── -->
+<div class="container">
+  <div class="section-rule reveal"><span class="rule-label">09 · Conclusion</span></div>
+
+  <h2 class="reveal">A Paper That Changed How We Think About Image Quality</h2>
+
+  <p class="reveal">SRGAN's lasting contribution is not really about super-resolution. It is about <strong>how we define success in image generation problems.</strong> By demonstrating convincingly that pixel-level metrics and human perceptual quality can diverge dramatically - and by providing a training strategy to optimise for the latter - it unlocked an entirely new design space for image restoration and generation models.</p>
+
+  <p class="reveal">The paper is not perfect. It leaves open real concerns about texture hallucination, training instability, and the principled choice of perceptual loss features. These concerns are well-founded and were subsequently addressed by the community, most directly in ESRGAN. But the core insight - that perception is the right target, and that a learned feature space is the right place to measure it - has aged extraordinarily well.</p>
+
+  <p class="reveal">For anyone building on image generation or restoration work today, SRGAN is required reading - not because its exact design choices are optimal, but because it forced the field to ask the right question for the first time.</p>
+
+  <div class="pull-quote reveal">
+    <p>"High PSNR doesn't mean high quality. High MOS means high quality. SRGAN knew the difference before most of the field did."</p>
+  </div>
+</div>
+
+</main>
+
+<!-- ══ FOOTER ════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="footer-title">SRGAN - Photo-Realistic Single Image Super-Resolution Using a GAN</div>
+  <p>Ledig et al. &nbsp;·&nbsp; IEEE CVPR 2017, pp. 4681–4690 &nbsp;·&nbsp; arXiv:1609.04802</p>
+  <br/>
+  <p>Written by Kriday Parmar, Yash Toshniwal &amp; Akshaan Khan &nbsp;·&nbsp; Academic course blog. All results cited directly from the original paper.</p>
+  <a class="github-link" href="https://github.com/leftthomas/SRGAN" target="_blank">
+    ↗ GitHub Repository
+  </a>
+</footer>
+
+<script>
+  // Intersection Observer for reveal animations
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  // Animate MOS bars on entry
+  const mosObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const bars = e.target.querySelectorAll('.mos-bar');
+        setTimeout(() => {
+          bars.forEach(bar => {
+            bar.style.width = bar.dataset.width;
+          });
+        }, 300);
+        mosObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.3 });
+
+  const chart = document.getElementById('mosChart');
+  if (chart) mosObserver.observe(chart);
+</script>
+
+</body>
+</html>
